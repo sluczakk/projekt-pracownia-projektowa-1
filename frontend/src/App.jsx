@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, NavLink } from "react-router-dom";
 import Playground from "./pages/Playground";
 import ExerciseList from "./pages/ExerciseList";
+import ExerciseDetails from "./pages/ExerciseDetails";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import { Navigate } from "react-router-dom";
@@ -92,6 +93,7 @@ function App() {
         <Routes>
           <Route path="/" element={<Playground />} />
           <Route path="/exercises" element={<ExerciseList />} />
+          <Route path="/exercises/:id" element={<ExerciseDetails />} />
           <Route path="/login" element={<Login setUser={setUser} />} />
           <Route path="/register" element={<Register setUser={setUser} />} />
         </Routes>

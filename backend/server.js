@@ -9,6 +9,8 @@ const path = require("path");
 const { spawn } = require("child_process");
 const crypto = require("crypto");
 
+const exercises = require("./exercises");
+
 const app = express();
 const PORT = 5000;
 
@@ -141,9 +143,13 @@ function cleanupJobDir(jobDir) {
   }, 200);
 }
 
+
 app.post("/run", (req, res) => {
   const code = req.body?.code; // Przesłany kod
   const language = req.body?.language; // Wybrany język
+  const exerciseid = req.body?.exerciseid; // wybrane zadanie; jezeli puste, to brak
+
+  let exercise = exercises[exerciseid];
 
   let stdout = " "; // Zwracane wartości
   let stderr = " "; // Zwracane błędy
@@ -153,19 +159,27 @@ app.post("/run", (req, res) => {
   const finish = (payload) => {
       if (!finished) {
         finished = true;
+        //console.log("kod2: " + JSON.stringify(payload));
         res.json(payload);
       }
     };
 
-  if (language == "python") {
-    // kazdy request dostaje inny folder
+  //console.log("kod1: " + code);
+
+  if (language == "python" || language == "java" || language == "cpp") {
     const jobId = crypto.randomUUID();
     const jobDir = path.join(__dirname, "temp", jobId);
 
     fs.mkdirSync(jobDir, { recursive: true });
-    fs.writeFileSync(path.join(jobDir, "main.py"), code);
 
-    // Uruchamiamy kontener Dockera z pythonem
+    if (language == "python")
+      fs.writeFileSync(path.join(jobDir, "main.py"), code);
+    else if (language == "java")
+      fs.writeFileSync(path.join(jobDir, "Main.java"), code);
+    else if (language == "cpp")
+      fs.writeFileSync(path.join(jobDir, "main.cpp"), code);
+
+    // folder z zapisanym plikiem
     const mountArg =
       process.platform === "win32"
         ? `${jobDir.replace(/\\/g, "/")}:/app`
@@ -173,33 +187,86 @@ app.post("/run", (req, res) => {
 
     const containerName = `job-${jobId}`;
 
-    const python_process = spawn("docker", [
-      "run",
-      "--rm",
-      "--name", containerName,
+    // uruchamiamy kontener z danym srodowiskiem
+    var code_process;
+    if (language == "python") {
+      code_process = spawn("docker", [
+        "run",
+        "--rm",
+        "--name", containerName,
 
-      "--network", "none",             // brak internetu
-      "--memory", memorylimit,         // limit RAM
-      "--cpus", cpuslimit,             // limit CPU
+        "--network", "none",             // brak internetu
+        "--memory", memorylimit,         // limit RAM
+        "--cpus", cpuslimit,             // limit CPU
 
-      "--security-opt", securityopt,
-      "--pids-limit", pidslimit,
-      "--read-only",
+        "--security-opt", securityopt,
+        "--pids-limit", pidslimit,
+        "--read-only",
 
-      "-v", mountArg,                  // folder z plikiem, z którego czytamy
+        "-i", // bedziemy wpisywac input
 
-      "runcode-python"                 // nazwa image dockera
-    ]);
+        "-v", mountArg,                  
 
-    /*const timeout = setTimeout(() => {
-      python_process.kill("SIGKILL");
-      finish({
-        stdout,
-        stderr: "Timeout",
-        returncode: -1
-      });
-    }, 5000); // 5 sekund*/
+        "runcode-python"                 // nazwa image dockera
+      ]);
+    }
+    else if (language == "java") {
+      code_process = spawn("docker", [
+        "run",
+        "--rm",
+        "--name", containerName,
 
+        "--network", "none",             // brak internetu
+        "--memory", "256m",              // limit RAM
+        "--cpus", cpuslimit,             // limit CPU
+
+        "--security-opt", securityopt,
+        "--pids-limit", pidslimit,
+        "--read-only",
+
+        "-i", // bedziemy wpisywac input
+
+        "-v", mountArg,                  
+
+        "runcode-java"                   // nazwa image dockera
+      ]);
+    }
+    else if (language == "cpp") {
+      code_process = spawn("docker", [
+        "run",
+        "--rm",
+        "--name", containerName,
+
+        "--network", "none",             // brak internetu
+        "--memory", "256m",              // limit RAM
+        "--cpus", cpuslimit,             // limit CPU
+
+        "--security-opt", securityopt,
+        "--pids-limit", pidslimit,
+        "--read-only",
+
+        "-i", // bedziemy wpisywac input
+
+        "-v", mountArg,                  // folder z plikiem, z którego czytamy
+
+        "runcode-cpp"                   // nazwa image dockera
+      ]);
+    }
+
+    // wpisujemy do programu wygenerowane dane wejsciowe do zadania
+    let exercise_input = "";
+    let exercise_output = "";
+    
+    if (exercise) {
+      let exercise_io = exercise.generateInputOutput();
+      exercise_input = (exercise_io.args);
+      exercise_output = exercise_io.expected;
+      code_process.stdin.write(exercise_input);
+      code_process.stdin.end();
+      //console.log("Input:", JSON.stringify(exercise_input));
+    }
+
+    // ustawiamy timeout
     const timeout = setTimeout(() => {
       spawn("docker", ["kill", containerName]); 
       cleanupJobDir(jobDir);
@@ -208,11 +275,14 @@ app.post("/run", (req, res) => {
         stderr: "Timeout",
         returncode: -1
       });
-    }, 5000); // timeout kontenera 5 sekund
+    }, 6000); // 6 sekund
 
-    python_process.stdout.on("data", (data) => {
+    // co program wypisuje do konsoli
+    code_process.stdout.on("data", (data) => {
+      //console.log("RAW STDOUT:", JSON.stringify(data.toString()));
       stdout += data.toString();
 
+      // zbyt duzy stdout
       if (stdout.length > MAX_STDOUT) {
         cleanupJobDir(jobDir);
         spawn("docker", ["kill", containerName]);
@@ -224,11 +294,15 @@ app.post("/run", (req, res) => {
       }
     });
 
-    python_process.stderr.on("data", (data) => {
+    stdout = ""
+
+    // bledy wypisywane przez program
+    code_process.stderr.on("data", (data) => {
       stderr += data.toString();
     });
 
-    python_process.on("error", (err) => {
+    // blad z uruchomieniem
+    code_process.on("error", (err) => {
       cleanupJobDir(jobDir);
       finish({
         stdout: "",
@@ -237,167 +311,67 @@ app.post("/run", (req, res) => {
       });
     });
 
-    python_process.on("close", (exitCode) => {
-      cleanupJobDir(jobDir);
-      finish({ stdout, stderr, exitCode });
-      return;
-    });
-  }
-  else if (language == "java") {
-    if (!code.includes("class Main ")) {
-      stderr = 'Code must contain "class Main"',
-      finish({ stdout, stderr, returncode: -1 });
-      return;
-    }
+    // zamkniecie procesu -> zwracamy wynik do uzytkownika
+    code_process.on("close", (exitCode) => {
+      // porownujemy stdout z tym co powinno wyjsc w zadaniu
+      if (exercise) {
+        solved = (stdout.trim() === exercise_output.trim());
 
-    // kazdy request dostaje inny folder
-    const jobId = crypto.randomUUID();
-    const jobDir = path.join(__dirname, "temp", jobId);
-
-    fs.mkdirSync(jobDir, { recursive: true });
-    fs.writeFileSync(path.join(jobDir, "Main.java"), code);
-
-    // etap kompilacji
-    const compile = spawn("javac", ["Main.java"], {
-      cwd: jobDir,
-    });
-    
-    const compiletimeout = setTimeout(() => {
-    compile.kill("SIGKILL");
-      finish({
-        stdout,
-        stderr: "Timeout",
-        returncode: -1
-      });
-    }, 3000); // 3 sekundy
-
-    compile.stderr.on("data", (data) => {
-      stderr += data.toString();
-    });
-
-    compile.on("close", (exitCode) => {
-      if (exitCode !== 0) {
-        setTimeout(() => {
-          fs.rm(jobDir, { recursive: true, force: true }, () => {}); // usuwamy folder z requestem
-        }, 200); 
-        clearTimeout(compiletimeout);
-        finish({ stdout, stderr, exitCode });
-        return;
+        if (solved) {
+          console.log("Udalo sie!");
+        }
+        else {
+          console.log("Nie udalo sie.");
+        }
       }
 
-      // uruchom plik
-      const java_process = spawn("java", ["Main"], {
-        cwd: jobDir,
-      });
-
-      const runtimeout = setTimeout(() => {
-      java_process.kill("SIGKILL");
-        finish({
-          stdout,
-          stderr: "Timeout",
-          returncode: -1
-        });
-      }, 3000); // 3 sekundy
-
-      // wynik kodu
-      java_process.stdout.on("data", (data) => {
-        stdout += data.toString();
-      });
-
-      // Błędy
-      java_process.stderr.on("data", (data) => {
-        stderr += data.toString();
-      });
-
-      java_process.on("close", (exitCode) => {
-          setTimeout(() => {
-            fs.rm(jobDir, { recursive: true, force: true }, () => {}); // usuwamy folder z requestem
-          }, 200); 
-        clearTimeout(runtimeout);
-        finish({ stdout, stderr, exitCode });
-        return;
-      });
-    });
-  }
-  else if (language == "cpp") {
-    // kazdy request dostaje inny folder
-    const jobId = crypto.randomUUID();
-    const jobDir = path.join(__dirname, "temp", jobId);
-
-    fs.mkdirSync(jobDir, { recursive: true });
-    fs.writeFileSync(path.join(jobDir, "main.cpp"), code);
-
-    // etap kompilacji
-    const compile = spawn("g++", ["main.cpp", "-o", "main"], {
-      cwd: jobDir,
-    });
-
-    const compiletimeout = setTimeout(() => {
-    compile.kill("SIGKILL");
-      finish({
-        stdout,
-        stderr: "Timeout",
-        returncode: -1
-      });
-    }, 3000); // 3 sekundy
-
-    compile.stderr.on("data", (data) => {
-      stderr += data.toString();
-    });
-
-    compile.on("close", (exitCode) => {
-      if (exitCode !== 0) {
-        setTimeout(() => {
-          fs.rm(jobDir, { recursive: true, force: true }, () => {}); // usuwamy folder z requestem
-        }, 200); 
-        clearTimeout(compiletimeout);
-        finish({ stdout, stderr, exitCode });
-        return;
+      cleanupJobDir(jobDir); 
+      if (exerciseid) {
+        finish({ stdout, stderr, exitCode, exercise_input, exercise_output });
       }
-
-      // uruchom plik
-      const cpp_process = spawn(
-        process.platform === "win32" ? "main.exe" : "./main",
-        [],
-        { cwd: jobDir }
-      );
-
-      const runtimeout = setTimeout(() => {
-      cpp_process.kill("SIGKILL");
-        finish({
-          stdout,
-          stderr: "Timeout",
-          returncode: -1
-        });
-      }, 3000); // 3 sekundy
-
-      // wynik kodu
-      cpp_process.stdout.on("data", (data) => {
-        stdout += data.toString();
-      });
-
-      // Błędy
-      cpp_process.stderr.on("data", (data) => {
-        stderr += data.toString();
-      });
-
-      cpp_process.on("close", (exitCode) => {
-          setTimeout(() => {
-            fs.rm(jobDir, { recursive: true, force: true }, () => {}); // usuwamy folder z requestem
-          }, 200); 
-        clearTimeout(runtimeout);
+      else {
         finish({ stdout, stderr, exitCode });
-        return;
-      });
+      }
+      return;
     });
   }
   else {
     finish({stdout, stderr, returncode: -1});
   }
-
   return;
-
 })
+
+/* ======== cwiczenia ======== */
+
+// lista cwiczen
+app.get("/exercises", (req, res) => {
+  const list = Object.values(exercises).map((ex) => ({
+    id: ex.id,
+    title: ex.title,
+    difficulty: ex.difficulty,
+    description: ex.description
+  }));
+
+  res.json(list);
+});
+
+// pojedyncze zadanie
+app.get("/exercises/:id", (req, res) => {
+  const exercise = exercises[req.params.id];
+
+  if (!exercise) {
+    return res.status(404).json({ message: "Zadania nie znaleziono" });
+  }
+
+  res.json({
+    id: exercise.id,
+    title: exercise.title,
+    difficulty: exercise.difficulty,
+    description: exercise.description,
+    description: exercise.longdescription
+  });
+});
+
 
 app.listen(PORT, () => {
   console.log(`Backend running on http://localhost:${PORT}`);
