@@ -2,111 +2,168 @@
   box-sizing: border-box;
 }
 
+html,
+body,
 #root {
-  max-width: 1500;
-  width: 80%;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  min-height: 100%;
 }
 
 body {
-  margin: 0;
-  background: #0b0f10;
-  color: #ffffff;
-  font-family: Arial, sans-serif;
+  background: #0f1115;
+  color: #e5e7eb;
+  font-family: Inter, Arial, sans-serif;
+  overflow-x: auto;
+}
+
+#root {
+  width: 100%;
+  max-width: none;
 }
 
 .app {
   min-height: 100vh;
-  background: #0b0f10;
+  min-width: 1200px;
+  background: #0f1115;
 }
 
+/* NAVBAR */
 .navbar {
-  height: 5vh;
+  height: 64px;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   padding: 0 24px;
-  border-bottom: 3px solid #6e1717;
-  background: #24020a;
-  gap: 25px;
-
-  color: white;
-
+  background: #12161d;
+  border-bottom: 1px solid #2b3240;
   position: sticky;
   top: 0;
-  backdrop-filter: blur(10px);
   z-index: 100;
 }
 
-.nav-left {
+.nav-left,
+.nav-right {
   display: flex;
   align-items: center;
-  gap: 24px;
-}
-
-.nav-link {
-  color: #f2b320;
-  text-decoration: none;
-  font-family: "Times New Roman", Georgia, serif;
-  font-size: 20px;
-  font-weight: 700;
-}
-
-.nav-link:hover {
-  color: #ffd15c;
+  gap: 22px;
 }
 
 .logo {
   margin: 0;
-  color: #ffffff;
-  font-family: "Times New Roman", Georgia, serif;
-  font-size: 24px;
-  font-variant: small-caps;
+  color: #f3f4f6;
+  font-size: 22px;
   font-weight: 700;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.2px;
 }
 
-.nav-right {
+.nav-link {
+  position: relative;
+  color: #9ca3af;
+  text-decoration: none;
+  font-size: 15px;
+  font-weight: 600;
+  padding: 6px 6px;
+  transition: color 0.2s ease;
+  
+}
+
+.nav-link:hover {
+  color: #f3f4f6;
+}
+
+.nav-link::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  bottom: -4px;
+  width: 0%;
+  height: 2px;
+  background: #ef4444;
+  transition: width 0.25s ease;
+}
+
+.nav-link:hover::after {
+  width: 100%;
+}
+
+.nav-link.active {
+  background: rgba(239, 68, 68, 0.15);
+  border-radius: 8px;
+}
+
+.nav-link.active::after {
+  width: 100%;
+}
+
+.login-btn {
+  color: #ffffff;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+  background: #ef4444;
+  padding: 10px 14px;
+  border-radius: 10px;
+  transition: background 0.2s ease;
+}
+
+.login-btn:hover {
+  background: #dc2626;
+}
+
+.user-section {
   display: flex;
   align-items: center;
-  gap: 28px;
+  gap: 10px;
 }
 
-.nav-right a {
-  color: #f2b320;
-  text-decoration: none;
-  font-family: "Times New Roman", Georgia, serif;
-  font-size: 20px;
-  font-weight: 700;
+.user-email {
+  font-size: 14px;
+  color: #d1d5db;
 }
 
-.nav-right a:hover {
-  color: #ffd15c;
+.logout-btn {
+  background: #ef4444;
+  color: white;
+  border: none;
+  padding: 9px 13px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background 0.2s ease;
 }
 
-/* MAIN */
+.logout-btn:hover {
+  background: #dc2626;
+}
+
 .main-layout {
   display: flex;
   gap: 16px;
-  padding: 16px 8px 8px;
-  min-height: calc(100vh - 52px);
+  padding: 16px;
+  min-height: calc(100vh - 64px);
 }
 
-/* PANELS */
 .panel {
-  background: #23261f;
-  border: 2px solid #a31212;
-  border-radius: 6px;
+  background: #181c23;
+  border: 1px solid #2b3240;
+  border-radius: 14px;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.22);
 }
 
 .left-panel {
   flex: 1.2;
+  min-width: 650px;
   min-height: 720px;
 }
 
 .right-column {
   flex: 1;
+  min-width: 450px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -122,27 +179,23 @@ body {
   min-height: 180px;
 }
 
-/* HEADERS */
 .panel-header {
-  background: #4d000b;
-  border-bottom: 2px solid #8f1111;
-  min-height: 70px;
+  min-height: 64px;
   padding: 14px 16px;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  background: #1f2430;
+  border-bottom: 1px solid #2b3240;
 }
 
 .panel-header h2 {
   margin: 0;
-  color: #ffffff;
-  font-family: "Times New Roman", Georgia, serif;
-  font-size: 28px;
-  font-variant: small-caps;
-  font-weight: 400;
+  color: #f3f4f6;
+  font-size: 18px;
+  font-weight: 600;
 }
 
-/* CONTROLS */
 .controls {
   display: flex;
   align-items: center;
@@ -150,51 +203,61 @@ body {
 }
 
 .language-select {
-  height: 36px;
-  padding: 0 10px;
-  background: #20242b;
-  color: #ffffff;
-  border: 1px solid #4a4f59;
-  border-radius: 8px;
+  height: 38px;
+  padding: 0 12px;
+  background: #12161d;
+  color: #e5e7eb;
+  border: 1px solid #2b3240;
+  border-radius: 10px;
   font-size: 14px;
+  outline: none;
+}
+
+.language-select:focus {
+  border-color: #ef4444;
 }
 
 .run-button {
-  height: 36px;
+  height: 38px;
   padding: 0 16px;
-  background: #4e8df7;
+  background: #ef4444;
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: 10px;
   font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
+  transition: background 0.2s ease;
 }
 
 .run-button:hover {
-  background: #3d7ae0;
+  background: #dc2626;
 }
 
 .run-button:disabled {
-  background: #6f84ad;
+  background: #7f1d1d;
   cursor: not-allowed;
 }
 
-/* CODE */
 .code-area {
   flex: 1;
   width: 100%;
   border: none;
   outline: none;
   resize: none;
-  background: #23261f;
-  color: #ffffff;
+  background: #181c23;
+  color: #f3f4f6;
   padding: 18px 16px;
   font-family: Consolas, Monaco, "Courier New", monospace;
   font-size: 14px;
-  line-height: 1.5;
+  line-height: 1.6;
 }
 
-/* OUTPUT / ERROR */
+.editor-wrapper {
+  flex: 1;
+  min-height: 0;
+}
+
 .output-area,
 .error-area {
   flex: 1;
@@ -203,19 +266,19 @@ body {
   overflow: auto;
   white-space: pre-wrap;
   word-break: break-word;
-  background: #23261f;
+  background: #181c23;
   font-family: Consolas, Monaco, "Courier New", monospace;
   font-size: 14px;
-  line-height: 1.5;
+  line-height: 1.6;
   text-align: left;
 }
 
 .output-area {
-  color: #66ff99;
+  color: #e5e7eb;
 }
 
 .error-area {
-  color: #ff7b6b;
+  color: #fca5a5;
 }
 
 @media (max-width: 900px) {
@@ -224,13 +287,14 @@ body {
   }
 
   .left-panel,
+  .right-column,
   .output-panel,
   .error-panel {
+    min-width: unset;
     min-height: unset;
   }
-}
 
-.editor-wrapper {
-  flex: 1;
-  min-height: 0;
+  .app {
+    min-width: 0;
+  }
 }

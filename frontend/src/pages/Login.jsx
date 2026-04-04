@@ -19,7 +19,7 @@ function Login({ setUser }) {
     const token = localStorage.getItem("token");
 
     if (token) {
-      navigate("/dashboard");
+      navigate("/");
     }
   }, []);
 
@@ -46,7 +46,7 @@ function Login({ setUser }) {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.message || "Login failed");
+        setError(data.message || "Logowanie się nie powiodło");
         return;
       }
 
@@ -54,7 +54,7 @@ function Login({ setUser }) {
       setUser(data.user);
       localStorage.setItem("user", JSON.stringify(data.user));
 
-      navigate("/dashboard");
+      navigate("/");
     } catch (err) {
       setError("Server error");
     }
@@ -63,7 +63,9 @@ function Login({ setUser }) {
   return (
     <div className="login-page">
       <div className="login-card">
-        <h2 className="login-title">Login</h2>
+        <div className="login-header">
+          <h2 className="login-title">Login</h2>
+        </div>
 
         <form className="login-form" onSubmit={handleSubmit}>
           <input

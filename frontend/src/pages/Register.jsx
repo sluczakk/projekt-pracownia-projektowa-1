@@ -20,7 +20,7 @@ function Register({ setUser }) {
     const token = localStorage.getItem("token");
 
     if (token) {
-      navigate("/dashboard");
+      navigate("/");
     }
   }, []);
 
@@ -47,7 +47,7 @@ function Register({ setUser }) {
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.message || "Registration failed");
+        setError(data.message || "Rejestracja się nie powiodła");
         return;
       }
 
@@ -64,7 +64,9 @@ function Register({ setUser }) {
   return (
     <div className="login-page">
       <div className="login-card">
-        <h2 className="login-title">Zarejestruj konto</h2>
+        <div className="login-header">
+          <h2 className="login-title">Zarejestruj konto</h2>
+        </div>
 
         <form className="login-form" onSubmit={handleSubmit}>
           <input
@@ -106,7 +108,7 @@ function Register({ setUser }) {
 
         <div className="login-footer">
           Masz już konto?{" "}
-          <span className="login-link" onClick={() => navigate("/")}>
+          <span className="login-link" onClick={() => navigate("/login")}>
              Zaloguj się
           </span>
         </div>

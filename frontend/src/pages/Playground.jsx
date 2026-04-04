@@ -9,7 +9,16 @@ export default function Playground() {
   const [stdout, setStdout] = useState("");
   const [stderr, setStderr] = useState("");
   const [loading, setLoading] = useState(false);
-  
+
+  // token wysylany do weryfikacji tozsamosci
+  function getAuthHeaders(withJson = false) {
+    const token = localStorage.getItem("token");
+
+    return {
+      ...(withJson ? { "Content-Type": "application/json" } : {}),
+      Authorization: `Bearer ${token}`,
+    };
+  }
 
   async function runCode() {
     setLoading(true);
@@ -19,9 +28,7 @@ export default function Playground() {
     try {
       const response = await fetch("http://localhost:5000/run", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
+        headers: getAuthHeaders(true),
         body: JSON.stringify({ code, language })
       });
 
