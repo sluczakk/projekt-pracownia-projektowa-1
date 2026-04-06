@@ -1,4 +1,3 @@
-import { Link } from "react-router-dom"
 import { NavLink } from "react-router-dom"
 import "./../App.css";
 
@@ -7,7 +6,7 @@ export default function Navbar() {
     <nav className="navbar">
 
       <div className="navbar-left">
-        <h2 className="navbar-logo">Tester umiejetnosci programowania</h2>
+        <h2 className="navbar-logo">Tester umiejętności programowania</h2>
       </div>
 
       <div className="navbar-right">

@@ -6,4 +6,4 @@ RUN useradd -m runner
 USER runner
 
 # CMD ["sh", "-c", "javac Main.java && java Main"]
-CMD ["sh", "-c", "javac -g:none Main.java && java -Xint Main"]
+CMD ["sh", "-c", "javac -g:none -d /tmp Main.java && java -Xint -cp /tmp Main"]

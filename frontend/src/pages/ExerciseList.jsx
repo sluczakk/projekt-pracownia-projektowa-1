@@ -1,26 +1,40 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
-import API_BASE_URL from "../config";
+import { fetchExercises, fetchSolvedExercises } from "../api/exercises";
+
+import ExerciseHeader from "../components/ExerciseStuff";
 
 export default function ExerciseList() {
   const [exercises, setExercises] = useState([]);
+  const [solvedMap, setSolvedMap] = useState({});
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   const navigate = useNavigate();
 
   useEffect(() => {
-    async function fetchExercises() {
+    async function load() {
       try {
-        const response = await fetch(`${API_BASE_URL}/exercises`);
+        const token = localStorage.getItem("token");
 
-        if (!response.ok) {
-          throw new Error("Failed to fetch exercises");
+        const [exercisesData, solvedData] = await Promise.all([
+          fetchExercises(),
+          token ? fetchSolvedExercises(token) : Promise.resolve([])
+        ]);
+
+        setExercises(exercisesData);
+
+        const grouped = {};
+        for (const item of solvedData) {
+          if (!grouped[item.exercise_id]) {
+            grouped[item.exercise_id] = [];
+          }
+          grouped[item.exercise_id].push(item.language);
         }
 
-        const data = await response.json();
-        setExercises(data);
+        setSolvedMap(grouped);
       } catch (err) {
         setError(err.message);
       } finally {
@@ -28,14 +42,8 @@ export default function ExerciseList() {
       }
     }
 
-    fetchExercises();
+    load();
   }, []);
-
-  const labels = {
-    "easy": "łatwe",
-    "medium": "średnie",
-    "hard": "trudne",
-  };
 
   if (loading) {
     return <div className="exercise-page">Ladowanie zadan...</div>;
@@ -52,22 +60,27 @@ export default function ExerciseList() {
       </div>
 
       <div className="exercise-list">
-        {exercises.map((exercise) => (
-          <button
-            key={exercise.id}
-            className="exercise-card"
-            onClick={() => navigate(`/exercises/${exercise.id}`)}
-          >
-            <div className="exercise-card-top">
-              <h2 className="exercise-title">{exercise.title}</h2>
-              <span className={`difficulty-badge difficulty-${exercise.difficulty}`}>
-                {labels[exercise.difficulty]}
-              </span>
-            </div>
+        {exercises.map((exercise) => {
+          const solvedLanguages = solvedMap[exercise.id] || [];
+          const isSolved = solvedLanguages.length > 0;
 
-            <p className="exercise-description">{exercise.description}</p>
-          </button>
-        ))}
+          return (
+            <button
+              key={exercise.id}
+              className="exercise-card"
+              onClick={() => navigate(`/exercises/${exercise.id}`)}
+            >
+              <ExerciseHeader
+                title={exercise.title}
+                difficulty={exercise.difficulty}
+                solvedLanguages={solvedLanguages}
+              />
+
+              <p className="exercise-description">{exercise.description}</p>
+
+            </button>
+          );
+        })}
       </div>
     </div>
   );

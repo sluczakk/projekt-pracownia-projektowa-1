@@ -2,8 +2,6 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useEffect } from "react";
 
-import "./Login.css";
-
 import API_BASE_URL from "../config";
 
 function Login({ setUser }) {

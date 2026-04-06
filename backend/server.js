@@ -6,13 +6,13 @@ const sqlite3 = require("sqlite3").verbose();
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const { spawn } = require("child_process");
+const { spawn, execSync } = require("child_process");
 const crypto = require("crypto");
 
 const exercises = require("./exercises");
 
 const app = express();
-const PORT = 5000;
+const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json({ limit: "50kb" }));
@@ -23,7 +23,33 @@ app.use(express.static(path.join(__dirname, "public")));
 
 // baza danych sqlite3
 
-const dbPath = process.env.DATABASE_PATH || "/home/data/database.sqlite";
+const dbPath = process.env.DATABASE_PATH || "/home/data/database_testerumiejetnosciprogramowania.sqlite";
+
+// do dockera
+function getTempPath() {
+  const isInDocker = fs.existsSync("/.dockerenv");
+  
+  if (isInDocker) {
+    const containerId = execSync("hostname").toString().trim();
+    const inspect = JSON.parse(execSync(`docker inspect ${containerId}`).toString());
+    const mounts = inspect[0].Mounts;
+    const match = mounts.find(m => "/app/temp".startsWith(m.Destination));
+    return {
+      containerTemp: "/app/temp",
+      hostTemp: "/app/temp".replace(match.Destination, match.Source)
+    };
+  } else {
+    const localTemp = path.join(__dirname, "temp");
+    return {
+      containerTemp: localTemp,
+      hostTemp: localTemp
+    };
+  }
+}
+
+const { containerTemp, hostTemp } = getTempPath();
+
+console.log("resolved =", path.resolve(dbPath));
 
 fs.mkdirSync("/home/data", { recursive: true });
 
@@ -45,6 +71,24 @@ db.serialize(() => {
     )
   `);
 });
+
+db.serialize(() => {
+  db.run(`
+    CREATE TABLE IF NOT EXISTS solved_exercises (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      exercise_id TEXT NOT NULL,
+      language TEXT NOT NULL,
+      solved_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+
+      UNIQUE(user_id, exercise_id, language),
+
+      FOREIGN KEY(user_id) REFERENCES users(id)
+    )
+  `);
+});
+
+db.run("PRAGMA foreign_keys = ON");
 
 // ======== konta uzytkownikow ========
 
@@ -123,6 +167,26 @@ function authMiddleware(req, res, next) {
   }
 }
 
+function getUser(req)
+{
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader){
+    return null
+  }
+  else {
+    const token = authHeader.split(" ")[1];
+
+    try {
+      const decoded = jwt.verify(token, SECRET_KEY);
+      return decoded;
+    } catch {
+      console.log("Nieprawidlowy token")
+      return null
+    }
+  }
+}
+
 app.get("/auth/verifytoken", authMiddleware, (req, res) => {
   res.json({ user: req.user });
 });
@@ -142,7 +206,6 @@ function cleanupJobDir(jobDir) {
     fs.rm(jobDir, { recursive: true, force: true }, () => {});
   }, 200);
 }
-
 
 app.post("/run", (req, res) => {
   const code = req.body?.code; // Przesłany kod
@@ -168,7 +231,11 @@ app.post("/run", (req, res) => {
 
   if (language == "python" || language == "java" || language == "cpp") {
     const jobId = crypto.randomUUID();
-    const jobDir = path.join(__dirname, "temp", jobId);
+    const jobDir = path.join(containerTemp, jobId);  // write files
+    const hostJobDir = path.join(hostTemp, jobId);            // mount arg
+
+    //console.log(jobDir);
+    //console.log(hostJobDir);
 
     fs.mkdirSync(jobDir, { recursive: true });
 
@@ -179,12 +246,7 @@ app.post("/run", (req, res) => {
     else if (language == "cpp")
       fs.writeFileSync(path.join(jobDir, "main.cpp"), code);
 
-    // folder z zapisanym plikiem
-    const mountArg =
-      process.platform === "win32"
-        ? `${jobDir.replace(/\\/g, "/")}:/app`
-        : `${jobDir}:/app`;
-
+    const mountArg = `${hostJobDir.replace(/\\/g, "/")}:/app`;
     const containerName = `job-${jobId}`;
 
     // uruchamiamy kontener z danym srodowiskiem
@@ -201,7 +263,7 @@ app.post("/run", (req, res) => {
 
         "--security-opt", securityopt,
         "--pids-limit", pidslimit,
-        "--read-only",
+        //"--read-only",
 
         "-i", // bedziemy wpisywac input
 
@@ -222,7 +284,7 @@ app.post("/run", (req, res) => {
 
         "--security-opt", securityopt,
         "--pids-limit", pidslimit,
-        "--read-only",
+        //"--read-only",
 
         "-i", // bedziemy wpisywac input
 
@@ -243,7 +305,7 @@ app.post("/run", (req, res) => {
 
         "--security-opt", securityopt,
         "--pids-limit", pidslimit,
-        "--read-only",
+        //"--read-only",
 
         "-i", // bedziemy wpisywac input
 
@@ -317,11 +379,25 @@ app.post("/run", (req, res) => {
       if (exercise) {
         solved = (stdout.trim() === exercise_output.trim());
 
+        const tokenuser = getUser(req)
+        if (tokenuser) {
+          if (solved) {
+            //console.log("Uzytkownik " + tokenuser.id + " poprawnie rozwiazal zadanie <" + exerciseid + "> w jezyku " + language)
+            db.run(
+              `
+              INSERT OR IGNORE INTO solved_exercises (user_id, exercise_id, language)
+              VALUES (?, ?, ?)
+            `,
+              [tokenuser.id, exerciseid, language]
+            );
+          }
+        }
+        
         if (solved) {
-          console.log("Udalo sie!");
+          //console.log("Udalo sie! user: ");
         }
         else {
-          console.log("Nie udalo sie.");
+          //console.log("Nie udalo sie.");
         }
       }
 
@@ -370,6 +446,46 @@ app.get("/exercises/:id", (req, res) => {
     description: exercise.description,
     description: exercise.longdescription
   });
+});
+
+// zadania rozwiazane przez uzytkownika
+app.get("/solved-exercises", authMiddleware, (req, res) => {
+  db.all(
+    `
+    SELECT exercise_id, language, solved_at
+    FROM solved_exercises
+    WHERE user_id = ?
+    `,
+    [req.user.id],
+    (err, rows) => {
+      if (err) {
+        return res.status(500).json({ message: "Database error" });
+      }
+
+      res.json(rows);
+    }
+  );
+});
+
+// jezyki pojedynczego rozwiazanego zadania
+app.get("/solved-exercises/:exerciseId", authMiddleware, (req, res) => {
+  const { exerciseId } = req.params;
+
+  db.all(
+    `
+    SELECT language, solved_at
+    FROM solved_exercises
+    WHERE user_id = ? AND exercise_id = ?
+    `,
+    [req.user.id, exerciseId],
+    (err, rows) => {
+      if (err) {
+        return res.status(500).json({ message: "Database error" });
+      }
+      //console.log(rows);
+      res.json(rows);
+    }
+  );
 });
 
 

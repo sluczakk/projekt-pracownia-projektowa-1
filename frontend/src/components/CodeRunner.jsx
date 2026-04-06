@@ -4,7 +4,12 @@ import React, { useState, useEffect } from "react";
 
 import API_BASE_URL from "../config";
 
-export default function CodeRunner({exerciseid="", exerciseTitle=""}) {
+export default function CodeRunner({
+  exerciseid = "",
+  exerciseTitle = "",
+  solvedLanguages = [],
+  setSolvedLanguages = () => {}
+}) {
   const [code, setCode] = useState(``);
   const [language, setLanguage] = useState("python");
 
@@ -54,27 +59,42 @@ export default function CodeRunner({exerciseid="", exerciseTitle=""}) {
       //console.log("wynik: " + data.stdout);
 
 			setDisplayText(
-					!exerciseid ? (
-							data.stdout || "Tutaj pojawi się wynik programu"
-					) : (
-							<>
-							<div style={{ fontWeight: "bold", color: "#dedc4a" }}>
-									STDOUT:
-							</div>
-							<div>{data.stdout}</div>
-							
-							<div style={{ marginTop: "10px", fontWeight: "bold", color: "#4ade80" }}>
-									INPUT:
-							</div>
-							<div>{data.exercise_input}</div>
+				!exerciseid ? (
+						data.stdout || ""
+				) : (
+						<>
+						<div style={{ fontWeight: "bold", color: "#d94ade" }}>
+								DANE WEJŚCIOWE:
+						</div>
+						<div>{data.exercise_input}</div>
 
-							<div style={{ marginTop: "10px", fontWeight: "bold", color: "#60a5fa" }}>
-									OCZEKIWANY OUTPUT:
-							</div>
-							<div>{data.exercise_output}</div>
-							</>
-					)
-        );
+						<div style={{ marginTop: "10px", fontWeight: "bold", color: "#dedc4a" }}>
+								STDOUT:
+						</div>
+						<div>{data.stdout}</div>
+
+						<div style={{ marginTop: "10px", fontWeight: "bold", color: "#60a5fa" }}>
+								OCZEKIWANY WYNIK:
+						</div>
+						<div>{data.exercise_output}</div>
+
+						<div style={{ marginTop: "10px", fontWeight: "bold", color: data.stdout.trim() === data.exercise_output.trim() ? "#4CAF50" : "#fa6060" }}>
+								<p>{data.stdout.trim() === data.exercise_output.trim() ? "Zadanie rozwiązano poprawnie" : "Niepoprawny wynik"}</p>
+						</div>
+						</>
+				)
+      );
+
+			// aktualizujemy rozwiazane jezyki lokalnie
+			if (exerciseid) {
+				if (data.stdout.trim() === data.exercise_output.trim()) {
+					setSolvedLanguages(prev => {
+						if (prev.includes(language)) return prev;
+						return [...prev, language];
+					});
+				}
+			}
+			
     } catch (err) {
       setStderr("Zapytanie się nie powiodło: " + err.message);
     } finally {
@@ -204,7 +224,7 @@ int main() {
           <div className="panel-header">
             <h2>Błędy</h2>
           </div>
-          <pre className="error-area">{stderr || "Tutaj pojawią się błędy"}</pre>
+          <pre className="error-area">{stderr || ""}</pre>
         </div>
       </section>
     </main>

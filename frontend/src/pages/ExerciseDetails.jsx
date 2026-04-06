@@ -1,9 +1,14 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 
-import CodeRunner from "../components/CodeRunner";
+import { fetchExerciseById, fetchSolvedLanguagesForExercise } from "../api/exercises";
 
-import API_BASE_URL from "../config";
+import {
+  languageLabels
+} from "../constants/exerciseconstants";
+
+import CodeRunner from "../components/CodeRunner";
+import ExerciseHeader from "../components/ExerciseStuff";
 
 export default function ExerciseDetails() {
   const { id } = useParams();
@@ -12,17 +17,12 @@ export default function ExerciseDetails() {
   const [exercise, setExercise] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [solvedLanguages, setSolvedLanguages] = useState([]);
 
   useEffect(() => {
-    async function fetchExercise() {
+    async function loadExercise() {
       try {
-        const response = await fetch(`${API_BASE_URL}/exercises/${id}`);
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch exercise");
-        }
-
-        const data = await response.json();
+        const data = await fetchExerciseById(id);
         setExercise(data);
       } catch (err) {
         setError(err.message);
@@ -31,14 +31,21 @@ export default function ExerciseDetails() {
       }
     }
 
-    fetchExercise();
-  }, [id]);
+    async function loadSolvedLanguages() {
+      try {
+        const token = localStorage.getItem("token");
+        if (!token) return;
+				console.log("loading " + id);
+        const data = await fetchSolvedLanguagesForExercise(id, token);
+        setSolvedLanguages(data.map((item) => item.language));
+      } catch (err) {
+        console.error(err);
+      }
+    }
 
-    const labels = {
-        "easy": "łatwe",
-        "medium": "średnie",
-        "hard": "trudne",
-    };
+    loadExercise();
+    loadSolvedLanguages();
+  }, [id]);
 
   if (loading) {
     return <div className="exercise-page">Ładowanie zadania...</div>;
@@ -59,12 +66,17 @@ export default function ExerciseDetails() {
       </button>
 
       <div className="exercise-details-card">
-        <div className="exercise-card-top">
-          <h1 className="exercise-details-title">{exercise.title}</h1>
-          <span className={`difficulty-badge difficulty-${exercise.difficulty}`}>
-            {labels[exercise.difficulty]}
-          </span>
-        </div>
+        <ExerciseHeader
+					title={exercise.title}
+					difficulty={exercise.difficulty}
+					solvedLanguages={solvedLanguages}
+				/>
+
+				{solvedLanguages.length > 0 && (
+        <p className="exercise-solved-languages">
+            Zadanie rozwiązano w językach: {solvedLanguages.map(lang => languageLabels[lang] || lang).join(", ")}
+        </p>
+        )}
 
         <div className="exercise-full-description">
           {exercise.description}
@@ -74,6 +86,8 @@ export default function ExerciseDetails() {
       <CodeRunner
         exerciseid={exercise.id}
         exerciseTitle={exercise.title}
+				solvedLanguages={solvedLanguages}
+  			setSolvedLanguages={setSolvedLanguages}
       />
     </div>
   );
